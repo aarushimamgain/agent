@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://internal/schema/workflowDefinition.schema.json",
+  "title": "Workflow Definition",
+  "description": "This document is the reference shape of a workflow definition. It is stored verbatim (as JSONB) in workflow_versions.definition once a workflow is versioned. It exists for humans and editor tooling to read; the actual enforcement of these rules at run time is done in src/validation/validateWorkflowDefinition.js, because several rules here (no dangling references, no cycles, approvers required) cannot be expressed as plain JSON Schema.",
+  "type": "object",
+  "required": ["name", "steps"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/step" }
+    }
+  },
+  "definitions": {
+    "step": {
+      "type": "object",
+      "required": ["id", "type", "inputs", "config", "permissions"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique within the workflow. Referenced by later steps' `inputs` and by condition branches.",
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "structured_input",
+            "document_retrieval",
+            "ai_extraction",
+            "ai_classification",
+            "deterministic_condition",
+            "human_approval",
+            "mock_external_action",
+            "final_report"
+          ]
+        },
+        "inputs": {
+          "type": "object",
+          "description": "Maps an input name this step needs to either a literal value or a reference to a prior step's output.",
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "#/definitions/stepOutputRef" },
+              { "description": "Any literal JSON value baked into the definition." }
+            ]
+          }
+        },
+        "config": {
+          "type": "object",
+          "description": "Type-specific settings. Required keys per type are enforced in code, see src/schema/stepTypes.js."
+        },
+        "permissions": {
+          "type": "object",
+          "required": ["tools"],
+          "properties": {
+            "tools": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Names of tools/actions this step is allowed to invoke. Empty array means 'calls nothing outside the engine'."
+            }
+          }
+        }
+      }
+    },
+    "stepOutputRef": {
+      "type": "object",
+      "required": ["from", "output"],
+      "properties": {
+        "from": { "type": "string", "description": "id of the step whose output is being read." },
+        "output": { "type": "string", "description": "name of the field on that step's output." }
+      }
+    }
+  }
+}

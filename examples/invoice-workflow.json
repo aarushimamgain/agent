@@ -1,0 +1,101 @@
+{
+  "name": "Invoice intake and triage",
+  "description": "Example definition exercising all 8 step types. Used by __tests__/validateWorkflowDefinition.test.js as a known-good baseline.",
+  "steps": [
+    {
+      "id": "intake",
+      "type": "structured_input",
+      "inputs": {},
+      "config": {
+        "fields": [
+          { "name": "customer_email", "type": "string" },
+          { "name": "document_url", "type": "string" }
+        ]
+      },
+      "permissions": { "tools": [] }
+    },
+    {
+      "id": "fetch_document",
+      "type": "document_retrieval",
+      "inputs": {
+        "document_url": { "from": "intake", "output": "document_url" }
+      },
+      "config": { "source": "s3_documents", "query": "by_url" },
+      "permissions": { "tools": ["document_store.read"] }
+    },
+    {
+      "id": "extract_fields",
+      "type": "ai_extraction",
+      "inputs": {
+        "document_text": { "from": "fetch_document", "output": "content" }
+      },
+      "config": {
+        "model": "gpt-4o-mini",
+        "output_fields": ["invoice_number", "total_amount", "vendor_name"]
+      },
+      "permissions": { "tools": ["llm.invoke"] }
+    },
+    {
+      "id": "classify_request",
+      "type": "ai_classification",
+      "inputs": {
+        "extracted": { "from": "extract_fields", "output": "fields" }
+      },
+      "config": {
+        "model": "gpt-4o-mini",
+        "categories": ["low_risk", "needs_review"]
+      },
+      "permissions": { "tools": ["llm.invoke"] }
+    },
+    {
+      "id": "check_risk",
+      "type": "deterministic_condition",
+      "inputs": {
+        "classification": { "from": "classify_request", "output": "category" }
+      },
+      "config": {
+        "expression": "classification == 'needs_review'",
+        "on_true": "request_approval",
+        "on_false": "notify_downstream"
+      },
+      "permissions": { "tools": [] }
+    },
+    {
+      "id": "request_approval",
+      "type": "human_approval",
+      "inputs": {
+        "extracted": { "from": "extract_fields", "output": "fields" },
+        "classification": { "from": "classify_request", "output": "category" }
+      },
+      "config": {
+        "approvers": ["finance-team@example.com"],
+        "message": "Please review this extracted invoice before it is processed."
+      },
+      "permissions": { "tools": [] }
+    },
+    {
+      "id": "notify_downstream",
+      "type": "mock_external_action",
+      "inputs": {
+        "extracted": { "from": "extract_fields", "output": "fields" }
+      },
+      "config": {
+        "action_name": "send_to_accounting_system",
+        "mock_response": { "status": "queued" }
+      },
+      "permissions": { "tools": ["send_to_accounting_system"] }
+    },
+    {
+      "id": "final_summary",
+      "type": "final_report",
+      "inputs": {
+        "classification": { "from": "classify_request", "output": "category" },
+        "extracted": { "from": "extract_fields", "output": "fields" }
+      },
+      "config": {
+        "template": "Processed invoice with classification {{classification}}; extracted data: {{extracted}}."
+      },
+      "permissions": { "tools": [] }
+    }
+  ]
+}

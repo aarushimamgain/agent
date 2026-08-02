@@ -1,0 +1,101 @@
+{
+  "name": "Job Application Screening",
+  "description": "Screens an incoming job application: fetch the resume, extract candidate info, classify fit, route strong fits straight to the ATS and send borderline candidates to a human reviewer. Exercises all 8 step types. Used by scripts/seedJobApplicationScreening.js as the demo workflow.",
+  "steps": [
+    {
+      "id": "intake",
+      "type": "structured_input",
+      "inputs": {},
+      "config": {
+        "fields": [
+          { "name": "candidate_email", "type": "string" },
+          { "name": "resume_url", "type": "string" }
+        ]
+      },
+      "permissions": { "tools": [] }
+    },
+    {
+      "id": "fetch_resume",
+      "type": "document_retrieval",
+      "inputs": {
+        "resume_url": { "from": "intake", "output": "resume_url" }
+      },
+      "config": { "source": "resume_store", "query": "by_url" },
+      "permissions": { "tools": ["document_store.read"] }
+    },
+    {
+      "id": "extract_candidate_info",
+      "type": "ai_extraction",
+      "inputs": {
+        "resume_text": { "from": "fetch_resume", "output": "content" }
+      },
+      "config": {
+        "model": "gpt-4o-mini",
+        "output_fields": ["years_experience", "skills", "education_level"]
+      },
+      "permissions": { "tools": ["llm.invoke"] }
+    },
+    {
+      "id": "classify_candidate",
+      "type": "ai_classification",
+      "inputs": {
+        "candidate_info": { "from": "extract_candidate_info", "output": "fields" }
+      },
+      "config": {
+        "model": "gpt-4o-mini",
+        "categories": ["strong_fit", "needs_review"]
+      },
+      "permissions": { "tools": ["llm.invoke"] }
+    },
+    {
+      "id": "check_review_needed",
+      "type": "deterministic_condition",
+      "inputs": {
+        "fit": { "from": "classify_candidate", "output": "category" }
+      },
+      "config": {
+        "expression": "fit == 'needs_review'",
+        "on_true": "human_review",
+        "on_false": "notify_ats"
+      },
+      "permissions": { "tools": [] }
+    },
+    {
+      "id": "human_review",
+      "type": "human_approval",
+      "inputs": {
+        "candidate_info": { "from": "extract_candidate_info", "output": "fields" },
+        "fit": { "from": "classify_candidate", "output": "category" }
+      },
+      "config": {
+        "approvers": ["hiring-manager@example.com"],
+        "message": "Please review this candidate's screening results before proceeding."
+      },
+      "permissions": { "tools": [] }
+    },
+    {
+      "id": "notify_ats",
+      "type": "mock_external_action",
+      "inputs": {
+        "candidate_info": { "from": "extract_candidate_info", "output": "fields" }
+      },
+      "config": {
+        "action_name": "notify_applicant_tracking_system",
+        "mock_response": { "status": "recorded" }
+      },
+      "permissions": { "tools": ["notify_applicant_tracking_system"] }
+    },
+    {
+      "id": "final_decision",
+      "type": "final_report",
+      "inputs": {
+        "fit": { "from": "classify_candidate", "output": "category" },
+        "candidate_info": { "from": "extract_candidate_info", "output": "fields" }
+      },
+      "config": {
+        "template": "Candidate screening complete. Fit: {{fit}}. Extracted info: {{candidate_info}}."
+      },
+      "permissions": { "tools": [] }
+    }
+  ]
+}
