@@ -5,6 +5,7 @@
   "description": "Foundation for a controlled agentic workflow automation platform (Express + SQLite).",
   "main": "src/server.js",
   "scripts": {
+    "build": "npm install --prefix frontend && npm run build --prefix frontend",
     "setup": "node scripts/setup.js",
     "seed": "node scripts/seedJobApplicationScreening.js",
     "seed:invoice": "node scripts/seedExampleWorkflow.js",

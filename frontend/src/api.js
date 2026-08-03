@@ -4,10 +4,27 @@
 // or method ever changes. Nothing here touches SQLite, or even knows it
 // exists - that's the backend's job entirely (see the Express routes in
 // ../../src/routes/).
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+//
+// Default depends on how the app is running:
+//   - `npm run dev` (import.meta.env.DEV): Vite serves this app on its own
+//     port (5173) separate from the Express backend (3000), so it needs an
+//     absolute URL to reach it.
+//   - `npm run build` (production): server.js serves these built files
+//     itself, same origin as the API, so relative paths ('') are correct -
+//     hardcoding localhost:3000 here would make the deployed app try to
+//     call the visitor's own machine instead of the server it came from.
+// VITE_API_BASE_URL always overrides both, for deploying the frontend
+// separately from the backend (e.g. two Railway services, or a static host
+// in front of a separately-hosted API).
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:3000' : '');
 
+// Every backend route is mounted under /api (see src/server.js) precisely
+// so it can't collide with this app's own client-side routes - e.g.
+// GET /workflows/:id is both a React Router page AND, without the prefix,
+// would have been indistinguishable from this app's JSON endpoint of the
+// same name once both are served from one origin.
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${BASE_URL}/api${path}`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options.headers },
   });
