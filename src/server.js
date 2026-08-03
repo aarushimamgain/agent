@@ -9,6 +9,25 @@ const express = require('express');
 require('./db');
 const workflowsRouter = require('./routes/workflows');
 const runsRouter = require('./routes/runs');
+const { seedIfNeeded } = require('../scripts/seedJobApplicationScreening');
+
+// Ensures the demo workflow exists every time this process boots, not just
+// once via a manually-run `npm run seed`. This matters specifically because
+// many hosts (e.g. a Railway service with no persistent volume attached)
+// wipe the filesystem - and therefore data/workflow.db - on every redeploy,
+// so relying on someone remembering to re-seed after each deploy isn't
+// reliable. seedIfNeeded() checks for the workflow by name first and is a
+// no-op if it's already there (see scripts/seedJobApplicationScreening.js),
+// so this is safe to run unconditionally on every boot and never touches
+// any other workflow a user has created themselves.
+try {
+  // seedIfNeeded takes no argument - it requires src/db itself, which
+  // resolves to this same cached singleton (Node's require cache), not a
+  // second connection.
+  seedIfNeeded();
+} catch (err) {
+  console.error('Demo data seeding failed (server will still start):', err.message);
+}
 
 const app = express();
 app.use(express.json());

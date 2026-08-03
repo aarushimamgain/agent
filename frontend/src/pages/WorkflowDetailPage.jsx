@@ -378,9 +378,32 @@ function VersionsTab({ workflowId, workflow, versions, onChanged }) {
 }
 
 function PublishVersionForm({ workflowId, onPublished }) {
+  // A minimal but genuinely valid starting point - structured_input
+  // requires at least one field (an empty array fails validation), and a
+  // final_report step means the run actually produces a visible output
+  // instead of completing with null.
   const [definitionText, setDefinitionText] = useState(
     JSON.stringify(
-      { name: 'New workflow', steps: [{ id: 'intake', type: 'structured_input', inputs: {}, config: { fields: [] }, permissions: { tools: [] } }] },
+      {
+        name: 'New workflow',
+        description: '',
+        steps: [
+          {
+            id: 'intake',
+            type: 'structured_input',
+            inputs: {},
+            config: { fields: [{ name: 'note', type: 'string' }] },
+            permissions: { tools: [] },
+          },
+          {
+            id: 'report',
+            type: 'final_report',
+            inputs: { note: { from: 'intake', output: 'note' } },
+            config: { template: 'You said: {{note}}' },
+            permissions: { tools: [] },
+          },
+        ],
+      },
       null,
       2
     )

@@ -127,4 +127,15 @@ function main() {
   console.log('Seed complete: 2 versions, 4 runs (completed x2, waiting_approval, failed).');
 }
 
-main();
+// Runs immediately when invoked as a CLI script (`node
+// scripts/seedJobApplicationScreening.js` / `npm run seed`). When instead
+// required as a module (see src/server.js, which calls this once on every
+// boot so a deploy with an empty/wiped database - e.g. no persistent
+// volume on the host - always has demo data without anyone needing to run
+// a one-off command), it does nothing on require and only runs when the
+// caller explicitly invokes seedIfNeeded().
+if (require.main === module) {
+  main();
+}
+
+module.exports = { seedIfNeeded: main };
