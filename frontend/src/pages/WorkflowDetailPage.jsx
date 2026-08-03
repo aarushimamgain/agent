@@ -112,6 +112,21 @@ function GraphAndRunsTab({ workflow, versions, navigate }) {
   }, [liveRun]);
 
   if (error) return <div className="error-banner">{error}</div>;
+  // A brand-new workflow has no published version yet - graphVersionNumber
+  // stays undefined in that case, so the version-detail fetch above never
+  // even fires. Without this check the page below would wait forever for
+  // versionDetail to arrive, stuck on "Loading..." with nothing to show it
+  // and no error either.
+  if (versions.length === 0) {
+    return (
+      <div className="card">
+        <p className="empty-state">
+          This workflow has no published version yet. Publish one from the <strong>Versions &amp; Diff</strong> tab to see its
+          step graph and start a run.
+        </p>
+      </div>
+    );
+  }
   if (!versionDetail || recentRuns === null) return <p className="empty-state">Loading...</p>;
 
   return (
